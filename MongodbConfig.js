@@ -12,10 +12,7 @@ export async function Connectdb() {
 
   try {
     if (!client) {
-      client = new MongoClient(url, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-      });
+      client = new MongoClient(url); // <-- remove unsupported options
       await client.connect(); // connect to MongoDB
       console.log("MongoDB connected");
     }
