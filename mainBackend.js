@@ -20,9 +20,15 @@ const port = process.env.PORT || 8080;
 // Parse CLIENT_URL into array for CORS
 const allowedOrigins = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(",") : ["http://localhost:5173"];
 
-// Middleware
 app.use(cors({
-  origin: allowedOrigins,
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true); // allow non-browser requests
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true); // allow request
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   methods: ["GET","POST","PUT","PATCH","DELETE"],
   credentials: true
 }));
