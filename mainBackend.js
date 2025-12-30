@@ -11,6 +11,8 @@ import {createServer} from "http"
 import { socket } from "../src/out-of-The-ashe/Component/AuthenticateComponent/SocketIoConfig.js";
 import { connected } from "process";
 import { ObjectId } from "mongodb";
+import dotenv from 'dotenv';
+dotenv.config();
 
 
  const onlineuser= new Map()
@@ -19,8 +21,9 @@ import { ObjectId } from "mongodb";
  const httpserver=createServer(app);
  const io= new Server(httpserver,{
   cors:{
-    origin:"http://localhost:5173",
-    methods:["GET","POST","PUT"]
+    origin:process.env.CLIENT_URL,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true
   }
  });
 io.on('connection',(socket)=>{
