@@ -1,453 +1,225 @@
 import e from "express";
-import { body,validationResult } from "express-validator";
+import { body, validationResult } from "express-validator";
 import multer from "multer";
+import path from "path";
+import fs from "fs";
 
-import { UploadFile ,DeleteFile} from "./ClounderConfig.js";
+import { UploadFile, DeleteFile } from "./ClounderConfig.js";
 import { Connectdb } from "./MongodbConfig.js";
 import { ObjectId } from "mongodb";
-export const routerChild=e.Router();
-const upload = multer({ dest: 'uploads/' });
-const uploadFields = upload.fields([
-    { name: 'childPhotos', maxCount: 999 },
-    { name: 'parentPhotos', maxCount: 999 }
+
+export const routerChild = e.Router();
+
+// -----------------------------
+// 1️⃣ Setup folders
+// -----------------------------
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+const PROFILE_DIR = path.join(process.cwd(), "profile");
+const OTHER_DIR = path.join(process.cwd(), "otherFile");
+
+[UPLOADS_DIR, PROFILE_DIR, OTHER_DIR].forEach((dir) => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
+
+// -----------------------------
+// 2️⃣ Multer config
+// -----------------------------
+const upload = multer({ dest: UPLOADS_DIR });
+export const uploadFields = upload.fields([
+  { name: 'childPhotos', maxCount: 999 },
+  { name: 'parentPhotos', maxCount: 999 }
 ]);
-const uploadOtherFile=multer({dest:'otherFile/'})
-const uploadOtherFiles=uploadOtherFile.fields([
-  {name:"otherFile",maxCount:999}
-])
-const Uploadprofile=multer({dest:'profile/'});
-const multerUploadProfile=Uploadprofile.single('uploadProfile')
- 
-routerChild.get('/',async(req,res)=>{
-  let dbInstance=null
-  try{
 
-   dbInstance=await Connectdb();
-   
-   if(dbInstance){
-     const childData=dbInstance.collection('Child');
-     const childInfo=await childData.find({}).toArray();
- 
-     
-     let female=0;
-     let male=0;
-     childInfo.forEach((dataChild)=>{
+const uploadOtherFile = multer({ dest: OTHER_DIR });
+export const uploadOtherFiles = uploadOtherFile.fields([{ name: "otherFile", maxCount: 999 }]);
 
-       if(dataChild.gender=='male'){
-        ++male;
-       }else if(dataChild.gender=='female'){
+const UploadProfile = multer({ dest: PROFILE_DIR });
+export const multerUploadProfile = UploadProfile.single('uploadProfile');
 
-          ++female;
+// -----------------------------
+// 3️⃣ Routes
+// -----------------------------
 
-       } 
-     })
-    
+// GET all children summary
+routerChild.get('/', async (req, res) => {
+  let dbInstance = null;
+  try {
+    dbInstance = await Connectdb();
+    if (dbInstance) {
+      const childData = dbInstance.collection('Child');
+      const childInfo = await childData.find({}).toArray();
 
+      let female = 0;
+      let male = 0;
+      childInfo.forEach((child) => {
+        if (child.gender === 'male') male++;
+        else if (child.gender === 'female') female++;
+      });
 
-     return res.status(200).json([{male:male,id:1},{female:female,id:2},{totalChild:female+male,id:3}]);
-   
-
-
-
-
-
-   }
-
-
-
-  }catch(err){
-    console.log(err.message)
-
-
+      return res.status(200).json([
+        { male, id: 1 },
+        { female, id: 2 },
+        { totalChild: female + male, id: 3 }
+      ]);
+    }
+  } catch (err) {
+    console.log(err.message);
+    return res.status(500).json({ ok: false, msg: err.message });
   }
+});
 
-
-
-})
-
-routerChild.post('/Create',uploadFields,async(req,res)=>{
-let dbInstance=null;
-let Parentfile=null
-    const dataField = req.body
-    const dataFileds=JSON.parse(dataField.Data);
-     console.log(JSON.parse(dataField.Data));
-     const ChildPhoto=req.files['childPhotos']
-     const ParentPhoto=req.files['parentPhotos'];
-     console.log(ChildPhoto)
-        try{
-    const Childfile=await  Promise.all(ChildPhoto.map(async(file)=>{
-       
-        const result=await UploadFile(file.path);
-          return result;
-     }))
-   
-    if(ParentPhoto){
-
-Parentfile=await  Promise.all(ParentPhoto.map(async(file)=>{
-       
-        const result=await UploadFile(file.path);
-          return result;
-     }))
-
-    }
-      dbInstance=await Connectdb();
-
-      if(dbInstance){
-          
-        const Chidldb=dbInstance.collection('Child');
-       
-       if(Parentfile){
-
-       Chidldb.insertOne({...dataFileds,Childfile:Childfile,Parentfile:Parentfile});
-
-    return res.status(201).json({msg:"succefuly Child and Parent Data store",ok:true});
-
-        }else{
-         Chidldb.insertOne({...dataFileds,Childfile:Childfile});
-       return res.status(201).json({msg:"succefuly Child Data store",ok:true});
-     }
-      
-
-
-      }
-
-
-
-
-
-
-
-     }catch(error){
-
-    return res.status(400).json({msg:error.message,ok:false})
-
-
+// CREATE child with photos
+routerChild.post('/Create', uploadFields, async (req, res) => {
+  const dataField = req.body;
+  const dataFields = JSON.parse(dataField.Data);
+  const childPhotos = req.files['childPhotos'] || [];
+  const parentPhotos = req.files['parentPhotos'] || [];
   
-     }
+  try {
+    const ChildFileUrls = await Promise.all(childPhotos.map(file => UploadFile(file.path)));
+    const ParentFileUrls = parentPhotos.length > 0
+      ? await Promise.all(parentPhotos.map(file => UploadFile(file.path)))
+      : [];
 
-     
+    const dbInstance = await Connectdb();
+    if (!dbInstance) throw new Error("Database connection failed");
 
+    const ChildCollection = dbInstance.collection('Child');
+    const insertData = { ...dataFields, Childfile: ChildFileUrls };
+    if (ParentFileUrls.length > 0) insertData.Parentfile = ParentFileUrls;
 
+    await ChildCollection.insertOne(insertData);
 
+    return res.status(201).json({ msg: "Child data stored successfully", ok: true });
 
-
-
-})
-
- routerChild.put('/Update',async(req,res)=>{
-      const updateInfo=req.body
-      const updateData=updateInfo.data;
-
-      const id=updateInfo.id;
-   
-   
-      console.log('start update');
-      
-   
-
-
-      let dbInstance=null;
-        try{
-
-            dbInstance=await Connectdb();
-         
-        
-         if(dbInstance){
-
-               const ChildUpdate=await dbInstance.collection('Child');
-               console.log("what happen");
-
-                const result=await ChildUpdate.updateOne({_id:new ObjectId(id)},{$set:{...updateData}});
-                console.log('succfully update')
-                console.log(result);
-             return res.status(200).json({msg:'succfully update',ok:true});
-             
-
-
-
-
-
-
-         }
-
-
-
-
-
-        }catch(err){
-          console.log('error happen');
-          console.log(err.message);
-       return res.status(400).json({msg:err.message,ok:false});
-
-
-        }
-
-
- })
-
-routerChild.get('/SearchByName',async(req,res)=>{
-
-   const {search}=req.query
-   let dbinstance=null
-
-      try{
-        dbinstance=await Connectdb();
-        const query=search 
-        ?{childFirstName:{$regex:search,
-        $options:'i'
-        }}:{}
-
-        if(dbinstance){
-          if(search.length>0){
-
-
-       
-          const Child=await dbinstance.collection('Child');
-          const result=await Child.find(query).toArray();
-          console.log("result")
-      
-          return res.status(200).json(result)
-     }else{
-      console.log('less zero')
-      return res.status(200).json([])
-     }
-
-
-
-
-
-        }
-
-
-
-
-
-      }catch(err){
-         
-          return res.status(400).json({msg:err.message});
-  
-
-      }
-
-
-
-
-})
-
-routerChild.get('/SearchById',async(req,res)=>{
-         const {searchId}=req.query
-         let dbInstance=null
-         try{
-            dbInstance=await Connectdb();
-            if(dbInstance){
-             const SingleChild=dbInstance.collection('Child');
-
-               const  result=await SingleChild.findOne({_id:new ObjectId(searchId)});
-               console.log("result single child");
-              return res.status(200).json(result);
-
-             }
-
-
-
-
-
-         }catch(err){
-        return res.status(400).json({msg:err.message,ok:false});
-
-         }
-
-
-
-})
-routerChild.post('/OtherFileCreate',uploadOtherFiles,async(req,res)=>{
-   const OtherData=req.body
-   const Data=JSON.parse(OtherData.data);
-   const id=Data.id;
-   let data={title:Data.title,description:Data.description};
-   const OtherFile=req.files['otherFile'];
-   try{
-
-   let dbinstance=null
-  
-    dbinstance=await Connectdb();
-   let FileUrl=null
-     if(dbinstance){
-
-    if(OtherFile.length>0){
- FileUrl=await Promise.all(OtherFile.map(async(file)=>{
-
-  const  result=await UploadFile(file.path);
-  return result
-
-}))
-        
-
-    }
-    const Childdb= dbinstance.collection('Child');
-    if(FileUrl){
-   
-      await Childdb.updateOne({_id:new ObjectId(id)},{$push:{otherChildData:{...data,_id:new ObjectId(),files:FileUrl,timeStamp:new Date()}}});
-
-     return res.status(200).json({msg:"succfully store data",ok:true});
-
-    }else{
-
-await Childdb.updateOne({_id:new ObjectId(id)},{$push:{otherChildData:{...data,_id:new ObjectId(),timeStamp:new Date()}}});
-  return res.status(200).json({msg:"succfully store data",ok:true});
-    }
-
-
-
-  
-     
-
-
-
-
-
-}
-     
-
-
-
-
-
-
-   }catch(err){
-
-        console.log(err.message);
-          return res.status(400).json({msg:err.message,ok:false});
-
-
-   }
-
-
-
-
-
-
-})
-routerChild.delete('/delete-file',async(req,res)=>{
-const {public_id,id,selectionType}=req.body
-
-if(!public_id || !id  || !selectionType) {
-  return res.status(400).json({msg:"public id not found or please login",ok:false});
-
-
-}
-try{
-  console.log("Start delete");
-  console.log('selection type');
-  console.log(selectionType=='child');
-
-const result=await DeleteFile(public_id);
-console.log('result');
-
-
- if(result.ok){
-  let dbInstance=null
-  dbInstance=await Connectdb();
-  if(!dbInstance){
-
-    return res.status(400).json({msg:"database not connect",ok:false});
-
-  } 
-console.log("what is error");
-  const childDb=await dbInstance.collection('Child');
-  const childResult=await childDb.findOne({_id:new ObjectId(id)})
-  console.log('childResult');
-  console.log(childResult);
-  if(!childResult){
-  return res.status(400).json({msg:'child is not found',ok:false});
-
+  } catch (error) {
+    return res.status(400).json({ msg: error.message, ok: false });
   }
+});
 
-  if(selectionType=='parent'){
-    console.log('parent get it')
-  const FileParent=childResult.Parentfile.filter((item)=>item.public_id!==public_id);
-  await childDb.updateOne({_id:new ObjectId(id)},{$set:{Parentfile:FileParent}})
+// UPDATE child
+routerChild.put('/Update', async (req, res) => {
+  const { id, data: updateData } = req.body;
 
-}else if(selectionType=='child'){
-console.log('child get it');
-    const FileChild=childResult.Childfile.filter((item)=>item.public_id!=public_id);
-  await childDb.updateOne({_id:new ObjectId(id)},{$set:{Childfile:FileChild}})
-}
+  try {
+    const dbInstance = await Connectdb();
+    if (!dbInstance) throw new Error("Database connection failed");
 
-return res.status(200).json(result);
+    const ChildCollection = dbInstance.collection('Child');
+    const result = await ChildCollection.updateOne({ _id: new ObjectId(id) }, { $set: updateData });
 
- }
+    return res.status(200).json({ msg: 'Successfully updated', ok: true, result });
+  } catch (err) {
+    console.log(err.message);
+    return res.status(400).json({ msg: err.message, ok: false });
+  }
+});
 
+// SEARCH child by name
+routerChild.get('/SearchByName', async (req, res) => {
+  const { search } = req.query;
+  if (!search || search.length === 0) return res.status(200).json([]);
 
+  try {
+    const dbInstance = await Connectdb();
+    const ChildCollection = dbInstance.collection('Child');
+    const result = await ChildCollection.find({ childFirstName: { $regex: search, $options: 'i' } }).toArray();
 
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(400).json({ msg: err.message, ok: false });
+  }
+});
 
-}catch(err){
-  console.log('err');
-  return res.status(400).json({mgs:err.message,ok:false});
+// SEARCH child by ID
+routerChild.get('/SearchById', async (req, res) => {
+  const { searchId } = req.query;
+  try {
+    const dbInstance = await Connectdb();
+    const ChildCollection = dbInstance.collection('Child');
+    const result = await ChildCollection.findOne({ _id: new ObjectId(searchId) });
 
+    return res.status(200).json(result);
+  } catch (err) {
+    return res.status(400).json({ msg: err.message, ok: false });
+  }
+});
 
-}
- 
+// UPLOAD other files
+routerChild.post('/OtherFileCreate', uploadOtherFiles, async (req, res) => {
+  const OtherData = JSON.parse(req.body.data);
+  const OtherFiles = req.files['otherFile'] || [];
+  try {
+    const dbInstance = await Connectdb();
+    if (!dbInstance) throw new Error("Database connection failed");
 
+    let FileUrls = [];
+    if (OtherFiles.length > 0) FileUrls = await Promise.all(OtherFiles.map(file => UploadFile(file.path)));
 
+    const ChildCollection = dbInstance.collection('Child');
+    const newData = { title: OtherData.title, description: OtherData.description, files: FileUrls, _id: new ObjectId(), timeStamp: new Date() };
 
-})
+    await ChildCollection.updateOne({ _id: new ObjectId(OtherData.id) }, { $push: { otherChildData: newData } });
+    return res.status(200).json({ msg: "Successfully stored other files", ok: true });
 
-routerChild.post('/UploadProfile',multerUploadProfile,async(req,res)=>{
+  } catch (err) {
+    return res.status(400).json({ msg: err.message, ok: false });
+  }
+});
 
+// DELETE file
+routerChild.delete('/delete-file', async (req, res) => {
+  const { public_id, id, selectionType } = req.body;
+  if (!public_id || !id || !selectionType) return res.status(400).json({ msg: "Missing parameters", ok: false });
 
- 
-    const {data}=req.body
-    const file=req.file;
-     let dbInstance=null
-     const Data=JSON.parse(data)
+  try {
+    const deleteResult = await DeleteFile(public_id);
+    if (!deleteResult.ok) throw new Error("Cloud deletion failed");
 
-     try{
-    const result=await UploadFile(file.path);
-     console.log('result');
-      console.log(result);
-    if(result.ok){
-   
+    const dbInstance = await Connectdb();
+    const ChildCollection = dbInstance.collection('Child');
+    const childData = await ChildCollection.findOne({ _id: new ObjectId(id) });
 
-   dbInstance=await Connectdb();
-   if(dbInstance){
-       const  childDb=await  dbInstance.collection('Child');
-    if(Data.type=='parent'){
+    if (!childData) return res.status(400).json({ msg: "Child not found", ok: false });
 
-    console.log('in parent')
-   
-      await childDb.updateOne({_id:new ObjectId(Data.id)},{$push:{Parentfile:result}});
-      return res.status(200).json({msg:'succfully upload profile',ok:true});
-     
-
-}else if(Data.type='child'){
-
-
-      await childDb.updateOne({_id:new ObjectId(Data.id)},{$push:{Childfile:result}});
-      return res.status(200).json({msg:'succfully upload profile',ok:true});
-
-}
-
-
-   }
-
-
+    if (selectionType === 'parent') {
+      const updatedParentFiles = childData.Parentfile.filter(f => f.public_id !== public_id);
+      await ChildCollection.updateOne({ _id: new ObjectId(id) }, { $set: { Parentfile: updatedParentFiles } });
+    } else if (selectionType === 'child') {
+      const updatedChildFiles = childData.Childfile.filter(f => f.public_id !== public_id);
+      await ChildCollection.updateOne({ _id: new ObjectId(id) }, { $set: { Childfile: updatedChildFiles } });
     }
 
+    return res.status(200).json(deleteResult);
 
-
-
-
-
-  }catch(err){
-
-
-  console.log(err.message);
-  return res.status(400).json({msg:err.message,ok:false})
-
+  } catch (err) {
+    return res.status(400).json({ msg: err.message, ok: false });
   }
+});
 
+// UPLOAD Profile
+routerChild.post('/UploadProfile', multerUploadProfile, async (req, res) => {
+  const { data } = req.body;
+  const file = req.file;
+  if (!file) return res.status(400).json({ msg: "No file uploaded", ok: false });
 
+  try {
+    const result = await UploadFile(file.path);
+    if (!result.ok) throw new Error("Upload failed");
 
+    const Data = JSON.parse(data);
+    const dbInstance = await Connectdb();
+    const ChildCollection = dbInstance.collection('Child');
 
-})
+    if (Data.type === 'parent') {
+      await ChildCollection.updateOne({ _id: new ObjectId(Data.id) }, { $push: { Parentfile: result } });
+    } else if (Data.type === 'child') {
+      await ChildCollection.updateOne({ _id: new ObjectId(Data.id) }, { $push: { Childfile: result } });
+    }
+
+    return res.status(200).json({ msg: 'Successfully uploaded profile', ok: true });
+
+  } catch (err) {
+    return res.status(400).json({ msg: err.message, ok: false });
+  }
+});
