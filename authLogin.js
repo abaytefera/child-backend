@@ -4,9 +4,10 @@ import bcrypt from "bcrypt"
 import { body, validationResult } from "express-validator";
 import jwt from "jsonwebtoken"
 import rateLimit from "express-rate-limit"
+import dotenv from 'dotenv';
+dotenv.config();
 
-
-
+ const  secret_key=process.env.SECRET_KEY
 
 
 export const routerlogin=e.Router();
@@ -71,7 +72,7 @@ if(!error.isEmpty()){
             if(match){
                         const userDB=await dbinstance.collection('User');
                         const UserData=await userDB.findOne({_id:userAuth.user_id});
-                       const  secret_key=process.env.SECRET_KEY
+              
                        const tokenOPtion={
                                  algorithm:'HS256',
                                  expiresIn:'30day'
