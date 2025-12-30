@@ -18,23 +18,33 @@ const httpServer = createServer(app);
 const port = process.env.PORT || 8080;
 
 // Parse CLIENT_URL into array for CORS
-const allowedOrigins = process.env.CLIENT_URL ? process.env.CLIENT_URL.split(",") : ["http://localhost:5173"];
 
+const allowedOrigins = process.env.CLIENT_URL 
+  ? process.env.CLIENT_URL.split(",") 
+  : ["http://localhost:5173"];
+
+// CORS middleware
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin) return callback(null, true); // allow non-browser requests
+    // allow requests with no origin (like mobile apps, curl)
+    if (!origin) return callback(null, true);
+
     if (allowedOrigins.includes(origin)) {
-      callback(null, true); // allow request
+      callback(null, true);
     } else {
       callback(new Error("Not allowed by CORS"));
     }
   },
-  methods: ["GET","POST","PUT","PATCH","DELETE"],
-  credentials: true
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
+
+// Handle preflight OPTIONS request for all routes
 app.options("*", cors({
   origin: allowedOrigins,
-  credentials: true
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
