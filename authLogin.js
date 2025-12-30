@@ -90,8 +90,5 @@ routerlogin.post("/", loginValidationRule, loginLimiter, async (req, res) => {
   } catch (err) {
     console.error("Login error:", err.message);
     return res.status(500).json({ ok: false, msg: err.message });
-  } finally {
-    dbInstance = null;
-    Closedb(); // call as function
-  }
+  } 
 });
