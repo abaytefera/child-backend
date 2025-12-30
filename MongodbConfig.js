@@ -2,35 +2,30 @@ import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 dotenv.config();
 
-const url = process.env.MONGO_URI;
-
 let client;
 let dbInstance;
 
 export async function Connectdb() {
-  if (dbInstance) return dbInstance; // reuse existing connection
+  if (dbInstance) return dbInstance;
 
   try {
     if (!client) {
-      client = new MongoClient(url); // <-- remove unsupported options
-      await client.connect(); // connect to MongoDB
+      client = new MongoClient(process.env.MONGO_URI);
+      await client.connect(); // ensures connection is open
       console.log("MongoDB connected");
     }
-
-    dbInstance = client.db("out-of-the-ashe-db"); // your DB name
+    dbInstance = client.db("out-of-the-ashe-db");
     return dbInstance;
-  } catch (error) {
-    console.error("MongoDB connection error:", error.message);
-    throw error;
+  } catch (err) {
+    console.error("MongoDB connection error:", err.message);
+    throw err;
   }
 }
 
-// Only close when the server is shutting down
 export async function Closedb() {
   if (client) {
     await client.close();
     client = null;
     dbInstance = null;
-    console.log("MongoDB connection closed");
   }
 }
