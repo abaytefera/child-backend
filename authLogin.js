@@ -71,7 +71,7 @@ if(!error.isEmpty()){
             if(match){
                         const userDB=await dbinstance.collection('User');
                         const UserData=await userDB.findOne({_id:userAuth.user_id});
-                        const secret_key='abu4858@gmail.com';
+                       const  secret_key=process.env.SECRET_KEY
                        const tokenOPtion={
                                  algorithm:'HS256',
                                  expiresIn:'30day'
