@@ -123,7 +123,16 @@ routerChild.get('/SearchByName', async (req, res) => {
   try {
     const dbInstance = await Connectdb();
     const ChildCollection = dbInstance.collection('Child');
-    const result = await ChildCollection.find({ childFirstName: { $regex: search, $options: 'i' } }).toArray();
+const parts = search.trim().split(" ");
+
+// Make sure we have at least 2 parts for first and last name
+const firstNameSearch = parts[0] || "";
+const lastNameSearch = parts[1] || "";
+
+const result = await ChildCollection.find({
+  childFirstName: { $regex: firstNameSearch, $options: "i" },
+  childLastName: { $regex: lastNameSearch, $options: "i" }
+}).toArray();
 
     return res.status(200).json(result);
   } catch (err) {
