@@ -149,7 +149,7 @@ routerEmployees.post('/Create',EmployeesValidation,async(req,res)=>{
              const hashsalt=10;
              const hasedPassword=await bcrypt.hash(password, hashsalt);
        
-             const EmployeInsert= await User.insertOne({firstName:firstName,lastName:lastName,email:email,phone:phone,role:role,educationBackground:educationBackground,profile:'https://vhglunlzlgjgdmwsihgc.supabase.co/storage/v1/object/sign/file/undraw_young-man-avatar_wgbd.svg?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV84MTIzOTYyYS04NzVkLTRjODUtYmUxMC04YmQzMjE1ZjA3N2IiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmaWxlL3VuZHJhd195b3VuZy1tYW4tYXZhdGFyX3dnYmQuc3ZnIiwiaWF0IjoxNzY3MDg4NjUzLCJleHAiOjE3OTg2MjQ2NTN9.nldTuoexTrRK-BxUkNIGfC2uC1BDdwo2zfvBpzmfvsU'});
+             const EmployeInsert= await User.insertOne({firstName:firstName,lastName:lastName,email:email,phone:phone,role:role,educationBackground:educationBackground,profile:'https://res.cloudinary.com/dkzvlqjp9/image/upload/v1767960854/undraw_young-man-avatar_wgbd_1_mmwgvi.svg'});
              if(EmployeInsert.insertedId){
               const EmployeAuthInsert=dbInstance.collection('userAuth');
               const  Employeauth=await EmployeAuthInsert.insertOne({email:email,user_id:EmployeInsert.insertedId,password: hasedPassword});
