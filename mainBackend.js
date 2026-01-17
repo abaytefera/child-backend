@@ -19,7 +19,7 @@ const httpServer = createServer(app);
 const port = process.env.PORT || 8080;
 
 /* =========================
-   ✅ CORS (FIXED)
+    CORS 
 ========================= */
 app.use(cors({
   origin: process.env.CLIENT_URL, // ONLY frontend URL
@@ -27,13 +27,13 @@ app.use(cors({
 }));
 
 /* =========================
-   ✅ BODY PARSERS
+    BODY PARSERS
 ========================= */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 /* =========================
-   ✅ ROUTES
+    ROUTES
 ========================= */
 app.use("/login", routerlogin);
 app.use("/Employees", routerEmployees);
@@ -42,15 +42,13 @@ app.use("/User", UserRouter);
 app.use("/message", messageRouter);
 
 /* =========================
-   ✅ MONGODB CONNECTION
+    MONGODB CONNECTION
 ========================= */
 Connectdb()
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error("MongoDB connection error:", err.message));
 
-/* =========================
-   ✅ SOCKET.IO (FIXED CORS)
-========================= */
+
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.CLIENT_URL,
@@ -181,7 +179,7 @@ io.on("connection", (socket) => {
 });
 
 /* =========================
-   ✅ START SERVER
+    START SERVER
 ========================= */
 httpServer.listen(port, () => {
   console.log(`Server running on port ${port}`);
