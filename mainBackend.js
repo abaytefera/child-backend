@@ -19,10 +19,23 @@ const httpServer = createServer(app);
 const port = process.env.PORT || 8080;
 
 /* =========================
-    CORS 
+    CORS (UPDATED ✅)
 ========================= */
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:5173", 
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      return callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true
 }));
 
@@ -49,9 +62,12 @@ Connectdb()
   .catch(err => console.error("MongoDB connection error:", err.message));
 
 
+/* =========================
+    SOCKET.IO (UPDATED CORS ✅)
+========================= */
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: allowedOrigins,
     credentials: true
   }
 });
